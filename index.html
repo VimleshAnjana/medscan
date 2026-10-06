@@ -58,7 +58,7 @@ td button{padding:6px 9px;background:#e74c3c;color:#fff}
 const $=s=>document.querySelector(s), val=id=>(document.getElementById(id)||{}).value||'';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let S={mode:'send',has_key:false,items:[],places:[],sources:[],sel:{mA:'',mB:''}}, imgs=[null,null], editKey=false;
-const MODEL='gemini-3.8-flash',GURL='https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent';
+const MODELS=['gemini-3.5-flash','gemini-3.1-flash-lite','gemini-2.5-flash-lite'],GURL=m=>'https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent';
 const PROMPT=`You are reading photos of ONE medicine package (front and/or back).
 Return ONLY JSON: {"name": "brand/generic name with strength and form as printed",
 "batch": "batch number (B.No / Batch No / Lot)", "expiry": "expiry as MM/YYYY",
@@ -83,8 +83,9 @@ async function api(p,j={}){
     const key=localStorage.getItem('medscan_key');if(!key)return{error:'पहले API Key सेव करें'};
     const parts=[{text:PROMPT},...j.images.slice(0,2).map(b=>({inline_data:{mime_type:'image/jpeg',data:b}}))];
     try{
-      const r=await fetch(GURL,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
+      let r;for(const m of MODELS){r=await fetch(GURL(m),{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
         body:JSON.stringify({contents:[{parts}],generationConfig:{responseMimeType:'application/json'}})});
+        if(r.ok||(r.status!=429&&r.status!=404))break}
       if(!r.ok)return{error:'Gemini error '+r.status+': '+(await r.text()).slice(0,200)};
       const o=await r.json(),t=o.candidates[0].content.parts.map(x=>x.text||'').join('').trim().replace(/^```(?:json)?|```$/g,'').trim(),x=JSON.parse(t);
       return{name:String(x.name||''),batch:String(x.batch||''),expiry:String(x.expiry||''),qty:String(x.quantity||'')}
